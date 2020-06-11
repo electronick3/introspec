@@ -22,43 +22,34 @@ def print_second_line(f=None, **kwarg):
     print(f"    {kwarg['obj_name']}.{kwarg['obj_method']} ({kwarg['obj_doc']})",  
             sep='', end='\n', file=f)
 
-def getattr_(obj):
+def getattr_(obj, parent=None):
     attr_dic = {}
-    
-    # Name object
-    obj_name = ""
+    VARIABLE, MODULE, FUNCTION  = '<Variable>', '<Loader>', '<Callable>'
+    obj_name, obj_doc, obj_method = trim_(str(obj), 20), "", ""
+
     if hasattr(obj, '__name__'):
         obj_name = trim_(obj.__name__, 20)
-    else:
-        obj_name = trim_(str(obj), 20)    
-        
-    # Type of object 
-    obj_type = ""
-    obj_type = type(obj)
-
-    # Doc string 
-    obj_doc = ""
+  
+    ptypename = type(obj)
+    
     if hasattr(obj, '__doc__'):
         obj_doc = trim_(obj.__doc__)
 
-    # Callable 
-    obj_call = False
-    obj_method = ""
-    if hasattr(obj, '__call__'):
-        obj_call = True
-        obj_method = obj_name
-
-    # Modules
-    obj_loader = False 
     if hasattr(obj, '__loader__'):
-        obj_loader = True
+        typename = MODULE
+    elif hasattr(obj, '__call__'):
+        typename = FUNCTION
+    else:
+        typename=VARIABLE
+
+    if parent:
+        obj_method = obj_name
+        obj_name = parent
 
     attr_dic.update({'obj_name': obj_name, 
-                    'obj_type': obj_type,
+                    'obj_type': f"{ptypename}, {typename}",
                     'obj_method': obj_method, 
-                    'obj_doc': obj_doc,
-                    'obj_call': obj_call,
-                    'obj_loader': obj_loader})
+                    'obj_doc': obj_doc})
 
     return attr_dic
 
@@ -83,12 +74,8 @@ def print_attr(obj, write_file=False):
 
             for sub_arg in [sub_arg for sub_arg in dir(attr) if not sub_arg.startswith('_')]:
                 sub_attr = getattr(attr, sub_arg)
-                sub_attr_attr = getattr_(sub_attr)
-                # this is fun
-                if callable(sub_attr):
-                    sub_attr_attr.update({'obj_name': str(arg)})
-                    print_second_line(f, **sub_attr_attr)    
-
+                sub_attr_attr = getattr_(sub_attr, arg)                
+                print_second_line(f, **sub_attr_attr)    
 
 if __name__ == '__main__':
     """
@@ -106,5 +93,6 @@ if __name__ == '__main__':
         без переносов не более 80 символов)
         <4 пробела>Имя.метод (сигнатура/описание)
     """
+    built = __builtins__
 
-    print_attr(__builtins__, write_file=True)
+    print_attr(built, write_file=False)
