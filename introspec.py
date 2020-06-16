@@ -1,81 +1,98 @@
 import sys, os
+import inspect
+import types
 from os import path
 
-def trim_(text, n=80):
-    
+#----------------------------------------------------------- const
+FORMAT_PARENT = "{} [{}] ({})"
+
+FORMAT_CHILD = "    {}.{} ({})"
+
+CURDIR = os.path.split(os.path.abspath(__file__))[0]
+
+FILENAME = os.path.join(CURDIR, 'file.txt')
+#----------------------------------------------------------- type
+def ismodule(obj):
+    return isinstance(obj, types.ModuleType)
+
+def isclass(obj):
+    return isinstance(obj, type) 
+
+def ismethod(obj):
+    return isinstance(obj, types.MethodType)
+
+def isfunction(obj):
+    return isinstance(obj, types.FunctionType)
+
+def isbuiltin(obj):
+    return isinstance(obj, types.BuiltinFunctionType) 
+
+#----------------------------------------------------------- private
+def _trim(text, n=80):
     if text == None:
         return ""
-
-    return ' '.join(text.replace('\n', ' ').split(' '))[:n]
-
-def print_first_line(f=None, **kwarg):
-    """
-    print the first formatted line
-    """
-    print(f"{kwarg['obj_name']} [{kwarg['obj_type']}] ({kwarg['obj_doc']})",  
-            sep='', end='\n', file=f)
-
-def print_second_line(f=None, **kwarg):
-    """
-    print the second formatted line 
-    """
-    print(f"    {kwarg['obj_name']}.{kwarg['obj_method']} ({kwarg['obj_doc']})",  
-            sep='', end='\n', file=f)
-
-def getattr_(obj, parent=None):
-    attr_dic = {}
-    VARIABLE, MODULE, FUNCTION  = '<Variable>', '<Loader>', '<Callable>'
-    obj_name, obj_doc, obj_method = trim_(str(obj), 20), "", ""
-
-    if hasattr(obj, '__name__'):
-        obj_name = trim_(obj.__name__, 20)
-  
-    ptypename = type(obj)
     
+    s = ' '.join(str(text).replace('\n', ' ').split(' '))[:n]
+    if n<80:
+        s.join('...')
+
+    return s
+
+def _getname(obj):
+    if hasattr(obj, '__name__'): 
+        return _trim(obj.__name__, 20)
+    
+    return _trim(str(obj),20)
+
+def _getdoc(obj):
     if hasattr(obj, '__doc__'):
-        obj_doc = trim_(obj.__doc__)
+        return _trim(obj.__doc__)
 
-    if hasattr(obj, '__loader__'):
-        typename = MODULE
-    elif hasattr(obj, '__call__'):
-        typename = FUNCTION
+    return ""    
+
+def _gettype(obj):
+   return type(obj)
+
+def _gettype2(obj):
+    VARIABLE, MODULE, FUNCTION, BUILTIN  = '<Variable>', '<Module>', '<Function/Method>', '<Builtin method>'
+
+    if isfunction(obj) or ismethod(obj):
+        return '{}, {}'.format(type(obj), FUNCTION)
+
+    elif ismodule(obj) or isclass(obj):
+        return '{}, {}'.format(type(obj), MODULE)   
+ 
+    elif isbuiltin(obj):
+        return '{}, {}'.format(type(obj), BUILTIN)
+        
     else:
-        typename=VARIABLE
+        return '{}, {}'.format(type(obj), VARIABLE)
+ 
+def _getattr(obj, parent):
 
-    if parent:
-        obj_method = obj_name
-        obj_name = parent
+    return {'obj_parent': _getname(parent),
+            'obj_child': _getname(obj), 
+            'obj_type': _gettype(obj),
+            'obj_doc': _getdoc(obj)}
 
-    attr_dic.update({'obj_name': obj_name, 
-                    'obj_type': f"{ptypename}, {typename}",
-                    'obj_method': obj_method, 
-                    'obj_doc': obj_doc})
+#----------------------------------------------------------- public
 
-    return attr_dic
-
-def print_attr(obj, write_file=False):
-    """
-    print_attr() -> obj, write_file=False
-
+def print_attr(parent):
+    """ 
+    print_attr() -> obj
 
     iter for every attributes in obj and print infomation  
     """
-    
-    cur_dir = os.path.split(os.path.abspath(__file__))[0]
-    out_file = os.path.join(cur_dir, 'file.txt')
+    for arg in [arg for arg in dir(parent) if not arg.startswith('_')]:
+        attr = getattr(parent, arg)
+        item = _getattr(attr, arg)
+        print(FORMAT_PARENT.format(item['obj_parent'], item['obj_type'], item['obj_doc']))
 
-    with open(out_file, 'w') as f: 
-        if not write_file:
-            f = None
-
-        for arg in [arg for arg in dir(obj) if not arg.startswith('_')]:
-            attr = getattr(obj, arg)
-            print_first_line(f, **getattr_(attr))
-
-            for sub_arg in [sub_arg for sub_arg in dir(attr) if not sub_arg.startswith('_')]:
-                sub_attr = getattr(attr, sub_arg)
-                sub_attr_attr = getattr_(sub_attr, arg)                
-                print_second_line(f, **sub_attr_attr)    
+        for sub_arg in [sub_arg for sub_arg in dir(attr) if not sub_arg.startswith('_')]:
+            sub_attr = getattr(attr, sub_arg)
+            sub_attr_attr = _getattr(sub_attr, arg)                
+            print(FORMAT_CHILD.format(sub_attr_attr['obj_parent'], sub_attr_attr['obj_child'], sub_attr_attr['obj_doc']))   
+               
 
 if __name__ == '__main__':
     """
@@ -95,4 +112,4 @@ if __name__ == '__main__':
     """
     built = __builtins__
 
-    print_attr(built, write_file=False)
+    print_attr(inspect)
