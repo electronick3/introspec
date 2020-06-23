@@ -18,6 +18,9 @@ def ismodule(obj):
 def isclass(obj):
     return isinstance(obj, type) 
 
+#def isobjectclass(obj, (object)) # дописать 
+#     pass    
+
 def ismethod(obj):
     return isinstance(obj, types.MethodType)
 
@@ -86,13 +89,18 @@ def print_attr(parent):
     for arg in [arg for arg in dir(parent) if not arg.startswith('_')]:
         attr = getattr(parent, arg)
         item = _getattr(attr, arg)
-        print(FORMAT_PARENT.format(item['obj_parent'], item['obj_type'], item['obj_doc']))
+        print(FORMAT_PARENT.format(item['obj_parent'], 
+                                    item['obj_type'], item['obj_doc']))
 
-        for sub_arg in [sub_arg for sub_arg in dir(attr) if not sub_arg.startswith('_')]:
+        for sub_arg in [sub_arg for sub_arg in dir(attr) 
+                        if not sub_arg.startswith('_')]:
             sub_attr = getattr(attr, sub_arg)
             sub_attr_attr = _getattr(sub_attr, arg)                
-            print(FORMAT_CHILD.format(sub_attr_attr['obj_parent'], sub_attr_attr['obj_child'], sub_attr_attr['obj_doc']))   
+            print(FORMAT_CHILD.format(sub_attr_attr['obj_parent'], 
+                                    sub_attr_attr['obj_child'], 
+                                    sub_attr_attr['obj_doc']))   
                
+# только модули смотрим внутрь и сделать только один генератор                
 
 if __name__ == '__main__':
     """
@@ -112,4 +120,4 @@ if __name__ == '__main__':
     """
     built = __builtins__
 
-    print_attr(inspect)
+    print_attr(built)
