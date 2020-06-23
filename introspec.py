@@ -19,7 +19,8 @@ def isclass(obj):
     return isinstance(obj, type) 
 
 #def isobjectclass(obj, (object)) # дописать 
-#     pass    
+#     pass
+#inspect.getmodule    
 
 def ismethod(obj):
     return isinstance(obj, types.MethodType)
@@ -71,7 +72,7 @@ def _gettype2(obj):
     else:
         return '{}, {}'.format(type(obj), VARIABLE)
  
-def _getattr(obj, parent):
+def _getattr(parent, obj):
 
     return {'obj_parent': _getname(parent),
             'obj_child': _getname(obj), 
@@ -79,6 +80,30 @@ def _getattr(obj, parent):
             'obj_doc': _getdoc(obj)}
 
 #----------------------------------------------------------- public
+
+def generator(parent):
+
+    for item in (arg for arg in dir(parent) if not arg.startswith('_')):
+        attr = getattr(parent, item)
+
+        yield _getattr(parent, attr)
+
+        if ismodule(attr) or isclass(attr):
+            yield from generator(attr)
+
+def new_print_attr(myObject):
+    rem = None
+    for n, line in enumerate(generator(myObject), 1):
+        if not rem:
+            rem = line['obj_parent']
+
+        if rem == line['obj_parent']:
+            print(FORMAT_PARENT.format(line['obj_child'],
+                                       line['obj_type'], line['obj_doc']))
+        else:
+            print(FORMAT_CHILD.format(line['obj_parent'],
+                                      line['obj_child'],
+                                      line['obj_doc']))
 
 def print_attr(parent):
     """ 
@@ -118,6 +143,11 @@ if __name__ == '__main__':
         без переносов не более 80 символов)
         <4 пробела>Имя.метод (сигнатура/описание)
     """
-    built = __builtins__
+    myObject = __builtins__
 
-    print_attr(built)
+    new_print_attr(myObject)
+    #
+    # myObject = os
+    # for n, line in  enumerate(generator(myObject), 1):
+    #     print(n, line)
+
