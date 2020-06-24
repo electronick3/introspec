@@ -1,131 +1,127 @@
-import sys, os
 import inspect
+import os
+import sys
 import types
 from os import path
 
-#----------------------------------------------------------- const
+# ----------------------------------------------------------- const
 FORMAT_PARENT = "{} [{}] ({})"
 
 FORMAT_CHILD = "    {}.{} ({})"
 
-CURDIR = os.path.split(os.path.abspath(__file__))[0]
+CUR_DIR = os.path.split(os.path.abspath(__file__))[0]
 
-FILENAME = os.path.join(CURDIR, 'file.txt')
-#----------------------------------------------------------- type
+FILENAME = os.path.join(CUR_DIR, 'file.txt')
+
+VARIABLE, MODULE, FUNCTION, BUILTIN = '<Variable>', '<Module>', '<Function/Method>', '<Builtin method>'
+
+
+# ----------------------------------------------------------- type
 def ismodule(obj):
     return isinstance(obj, types.ModuleType)
 
-def isclass(obj):
-    return isinstance(obj, type) 
 
-#def isobjectclass(obj, (object)) # дописать 
-#     pass
-#inspect.getmodule    
+def isclass(obj):
+    return isinstance(obj, type)
+
 
 def ismethod(obj):
     return isinstance(obj, types.MethodType)
 
+
 def isfunction(obj):
     return isinstance(obj, types.FunctionType)
 
-def isbuiltin(obj):
-    return isinstance(obj, types.BuiltinFunctionType) 
 
-#----------------------------------------------------------- private
+def isbuiltin(obj):
+    return isinstance(obj, types.BuiltinFunctionType)
+
+
+# ----------------------------------------------------------- private
 def _trim(text, n=80):
-    if text == None:
+    if text is None:
         return ""
-    
+
     s = ' '.join(str(text).replace('\n', ' ').split(' '))[:n]
-    if n<80:
+    if n < 80:
         s.join('...')
 
     return s
 
+
 def _getname(obj):
-    if hasattr(obj, '__name__'): 
+    if hasattr(obj, '__name__'):
         return _trim(obj.__name__, 20)
-    
-    return _trim(str(obj),20)
+
+    return _trim(str(obj), 20)
+
 
 def _getdoc(obj):
     if hasattr(obj, '__doc__'):
         return _trim(obj.__doc__)
 
-    return ""    
+    return ""
+
 
 def _gettype(obj):
-   return type(obj)
+    return type(obj)
+
 
 def _gettype2(obj):
-    VARIABLE, MODULE, FUNCTION, BUILTIN  = '<Variable>', '<Module>', '<Function/Method>', '<Builtin method>'
-
     if isfunction(obj) or ismethod(obj):
         return '{}, {}'.format(type(obj), FUNCTION)
 
     elif ismodule(obj) or isclass(obj):
-        return '{}, {}'.format(type(obj), MODULE)   
- 
+        return '{}, {}'.format(type(obj), MODULE)
+
     elif isbuiltin(obj):
         return '{}, {}'.format(type(obj), BUILTIN)
-        
+
     else:
         return '{}, {}'.format(type(obj), VARIABLE)
- 
-def _getattr(parent, obj):
 
+
+def _getattr(parent, obj):
     return {'obj_parent': _getname(parent),
-            'obj_child': _getname(obj), 
-            'obj_type': _gettype(obj),
+            'obj_child': _getname(obj),
+            'obj_type': _gettype2(obj),
             'obj_doc': _getdoc(obj)}
 
-#----------------------------------------------------------- public
 
-def generator(parent):
+# ----------------------------------------------------------- public
+
+def attributes(parent, processed=None):
+    if processed is None:
+        processed = set()
 
     for item in (arg for arg in dir(parent) if not arg.startswith('_')):
         attr = getattr(parent, item)
 
-        yield _getattr(parent, attr)
+        if (parent, item,) not in processed:
+            processed.add((parent, item,))
+            yield _getattr(parent, attr)
+        else:
+            continue
 
         if ismodule(attr) or isclass(attr):
-            yield from generator(attr)
+            yield from attributes(attr, processed)
 
-def new_print_attr(myObject):
-    rem = None
-    for n, line in enumerate(generator(myObject), 1):
-        if not rem:
-            rem = line['obj_parent']
 
-        if rem == line['obj_parent']:
-            print(FORMAT_PARENT.format(line['obj_child'],
-                                       line['obj_type'], line['obj_doc']))
+def print_attr(my_object):
+    parent = None
+    for item in attributes(my_object):
+        if not parent:
+            parent = item['obj_parent']
+
+        if parent == item['obj_parent']:
+            print(FORMAT_PARENT.format(item['obj_child'],
+                                       item['obj_type'],
+                                       item['obj_doc']))
         else:
-            print(FORMAT_CHILD.format(line['obj_parent'],
-                                      line['obj_child'],
-                                      line['obj_doc']))
+            print(FORMAT_CHILD.format(item['obj_parent'],
+                                      item['obj_child'],
+                                      item['obj_doc']))
 
-def print_attr(parent):
-    """ 
-    print_attr() -> obj
-
-    iter for every attributes in obj and print infomation  
-    """
-    for arg in [arg for arg in dir(parent) if not arg.startswith('_')]:
-        attr = getattr(parent, arg)
-        item = _getattr(attr, arg)
-        print(FORMAT_PARENT.format(item['obj_parent'], 
-                                    item['obj_type'], item['obj_doc']))
-
-        for sub_arg in [sub_arg for sub_arg in dir(attr) 
-                        if not sub_arg.startswith('_')]:
-            sub_attr = getattr(attr, sub_arg)
-            sub_attr_attr = _getattr(sub_attr, arg)                
-            print(FORMAT_CHILD.format(sub_attr_attr['obj_parent'], 
-                                    sub_attr_attr['obj_child'], 
-                                    sub_attr_attr['obj_doc']))   
-               
-# только модули смотрим внутрь и сделать только один генератор                
 
 if __name__ == '__main__':
     """
@@ -145,9 +141,4 @@ if __name__ == '__main__':
     """
     myObject = __builtins__
 
-    new_print_attr(myObject)
-    #
-    # myObject = os
-    # for n, line in  enumerate(generator(myObject), 1):
-    #     print(n, line)
-
+    print_attr(myObject)
