@@ -1,115 +1,127 @@
+""" Get useful information from live Python objects. """
+
+__all__ = ['print_attributes']
+__author__ = ('Chagay Nikolay aka Electronick <chagay.ni@gmail.com>')
+
+# This module is in the public domain.  No warranties.
+
 import inspect
-import os
-import sys
-import types
-from os import path
+import argparse
+import importlib
 
 # ----------------------------------------------------------- const
 FORMAT_PARENT = "{} [{}] ({})"
 
 FORMAT_CHILD = "    {}.{} ({})"
 
-CUR_DIR = os.path.split(os.path.abspath(__file__))[0]
+TEXT_LENGTH = 79
 
-FILENAME = os.path.join(CUR_DIR, 'file.txt')
-
-VARIABLE, MODULE, FUNCTION, BUILTIN = '<Variable>', '<Module>', '<Function/Method>', '<Builtin method>'
-
-
-# ----------------------------------------------------------- type
-def ismodule(obj):
-    return isinstance(obj, types.ModuleType)
-
-
-def isclass(obj):
-    return isinstance(obj, type)
-
-
-def ismethod(obj):
-    return isinstance(obj, types.MethodType)
-
-
-def isfunction(obj):
-    return isinstance(obj, types.FunctionType)
-
-
-def isbuiltin(obj):
-    return isinstance(obj, types.BuiltinFunctionType)
+NAME_LENGTH = 20
 
 
 # ----------------------------------------------------------- private
-def _trim(text, n=80):
+def _parser():
+    """Return the parsed arguments """
+    parser = argparse.ArgumentParser(description='Parse object and setting attributes')
+    parser.add_argument('-o', action='store', dest='object', type=str, default=None,
+                        help='Object for introspection')
+    parser.add_argument('-p', action='store_true', dest='only_public',
+                        help='Deselect private attributes')
+
+    return parser.parse_args()
+
+
+def _parse_args(args):
+    """
+    First if args.object is None then print attributes of __builtins__ module
+    else
+    Try import args.object if not raise ImportError
+    and then
+    print the attributes of args.object
+    """
+    print(args)
+
+    if args.object is None or args.object == '__builtins__':
+        print_attributes(__builtins__, args.only_public)
+        return
+
+    try:
+        obj = importlib.import_module(args.object)
+        print_attributes(obj, args.only_public)
+    except ImportError:
+        print("Unable to import '{}'\n".format(args.object))
+
+
+def _trim(text, n=TEXT_LENGTH):
+    """ Return the trimmed text,  not more than TEXT_LEN """
     if text is None:
         return ""
 
-    s = ' '.join(str(text).replace('\n', ' ').split(' '))[:n]
-    if n < 80:
-        s.join('...')
-
+    s = ' '.join(str(text).replace('\n', ' ').split(' '))
+    if len(s) > n:
+        if n == TEXT_LENGTH:
+            if len(s) > TEXT_LENGTH:
+                return '{}...'.format(s[:n - 3])
+        else:
+            return s[:n]
     return s
 
 
 def _getname(obj):
+    """Return trimmed __name__ or string representation of obj"""
     if hasattr(obj, '__name__'):
-        return _trim(obj.__name__, 20)
+        return _trim(obj.__name__, NAME_LENGTH)
 
-    return _trim(str(obj), 20)
+    return _trim(str(obj), NAME_LENGTH)
 
 
 def _getdoc(obj):
-    if hasattr(obj, '__doc__'):
-        return _trim(obj.__doc__)
-
-    return ""
+    """Return trimmed doc string of obj"""
+    return _trim(inspect.getdoc(obj))
 
 
 def _gettype(obj):
+    """Return type of obj"""
     return type(obj)
 
 
-def _gettype2(obj):
-    if isfunction(obj) or ismethod(obj):
-        return '{}, {}'.format(type(obj), FUNCTION)
-
-    elif ismodule(obj) or isclass(obj):
-        return '{}, {}'.format(type(obj), MODULE)
-
-    elif isbuiltin(obj):
-        return '{}, {}'.format(type(obj), BUILTIN)
-
-    else:
-        return '{}, {}'.format(type(obj), VARIABLE)
-
-
 def _getattr(parent, obj):
+    """Returns the dict object needed for printing formatting"""
     return {'obj_parent': _getname(parent),
             'obj_child': _getname(obj),
-            'obj_type': _gettype2(obj),
+            'obj_type': _gettype(obj),
             'obj_doc': _getdoc(obj)}
+
+
+def _attributes(parent, processed=None, only_public=False):
+    """Obtaining recursively the attributes of the parent.
+     stores the received attributes in the processed variable"""
+    if processed is None:
+        processed = set()
+
+    for name, item in (arg for arg in inspect.getmembers(parent)
+                       if (only_public and not arg[0].startswith('_')) or not only_public):
+
+        try:
+            if (parent, name,) not in processed:
+                processed.add((parent, name,))
+                yield _getattr(parent, item)
+            else:
+                continue
+        except TypeError:
+            pass
+
+        if inspect.ismodule(item) or inspect.isclass(item):
+            yield from _attributes(item, processed, only_public)
 
 
 # ----------------------------------------------------------- public
 
-def attributes(parent, processed=None):
-    if processed is None:
-        processed = set()
 
-    for item in (arg for arg in dir(parent) if not arg.startswith('_')):
-        attr = getattr(parent, item)
-
-        if (parent, item,) not in processed:
-            processed.add((parent, item,))
-            yield _getattr(parent, attr)
-        else:
-            continue
-
-        if ismodule(attr) or isclass(attr):
-            yield from attributes(attr, processed)
-
-
-def print_attr(my_object):
+def print_attributes(my_object, only_public=False):
+    """ Print formatted attributes for given my_object"""
     parent = None
-    for item in attributes(my_object):
+    for item in _attributes(my_object, only_public=only_public):
         if not parent:
             parent = item['obj_parent']
 
@@ -139,6 +151,4 @@ if __name__ == '__main__':
         без переносов не более 80 символов)
         <4 пробела>Имя.метод (сигнатура/описание)
     """
-    myObject = __builtins__
-
-    print_attr(myObject)
+    _parse_args(_parser())
