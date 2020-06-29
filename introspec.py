@@ -25,8 +25,11 @@ def _parser():
     parser = argparse.ArgumentParser(description='Parse object and setting attributes')
     parser.add_argument('-o', action='store', dest='object', type=str, default=None,
                         help='Object for introspection')
-    parser.add_argument('-p', action='store_true', dest='only_public',
+    parser.add_argument('-op', action='store_true', dest='only_public',
                         help='Deselect private attributes')
+
+    parser.add_argument('-p', action='store', dest='page_count', type=int, default=None,
+                        help='Pagination')
 
     return parser.parse_args()
 
@@ -39,15 +42,14 @@ def _parse_args(args):
     and then
     print the attributes of args.object
     """
-    print(args)
-
     if args.object is None or args.object == '__builtins__':
-        print_attributes(__builtins__, args.only_public)
+        print_attributes(__builtins__, args.page_count, args.only_public)
         return
 
     try:
         obj = importlib.import_module(args.object)
-        print_attributes(obj, args.only_public)
+
+        print_attributes(obj, args.page_count, args.only_public)
     except ImportError:
         print("Unable to import '{}'\n".format(args.object))
 
@@ -117,10 +119,9 @@ def _attributes(parent, processed=None, only_public=False):
 
 # ----------------------------------------------------------- public
 
-
-def print_attributes(my_object, only_public=False):
-    """ Print formatted attributes for given my_object"""
+def print_attributes(my_object, page=None, only_public=False):
     parent = None
+    p = page
     for item in _attributes(my_object, only_public=only_public):
         if not parent:
             parent = item['obj_parent']
@@ -133,6 +134,12 @@ def print_attributes(my_object, only_public=False):
             print(FORMAT_CHILD.format(item['obj_parent'],
                                       item['obj_child'],
                                       item['obj_doc']))
+        if page:
+            p -= 1
+
+            if p == 0:
+                input('Press enter to continue...')
+                p = page
 
 
 if __name__ == '__main__':
