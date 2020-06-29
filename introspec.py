@@ -92,10 +92,11 @@ def _getattr(parent, obj):
     return {'obj_parent': _getname(parent),
             'obj_child': _getname(obj),
             'obj_type': _gettype(obj),
-            'obj_doc': _getdoc(obj)}
+            'obj_doc': _getdoc(obj)
+            }
 
 
-def _attributes(parent, processed=None, only_public=False):
+def _attributes(parent, rem_parent=None, processed=None, only_public=False):
     """Obtaining recursively the attributes of the parent.
      stores the received attributes in the processed variable"""
     if processed is None:
@@ -107,39 +108,36 @@ def _attributes(parent, processed=None, only_public=False):
         try:
             if (parent, name,) not in processed:
                 processed.add((parent, name,))
-                yield _getattr(parent, item)
+                if rem_parent:
+                    yield _getattr(rem_parent, item)
+                else:
+                    yield _getattr(item, item)
+
             else:
                 continue
         except TypeError:
             pass
 
         if inspect.ismodule(item) or inspect.isclass(item):
-            yield from _attributes(item, processed, only_public)
+            yield from _attributes(item, item, processed, only_public)
 
 
 # ----------------------------------------------------------- public
 
 def print_attributes(my_object, page=None, only_public=False):
-    parent = None
-    p = page
-    for item in _attributes(my_object, only_public=only_public):
-        if not parent:
-            parent = item['obj_parent']
+    for num, item in enumerate(_attributes(my_object, only_public=only_public)):
 
-        if parent == item['obj_parent']:
-            print(FORMAT_PARENT.format(item['obj_child'],
+        if item['obj_parent'] == item['obj_child']:
+            print(FORMAT_PARENT.format(item['obj_parent'],
                                        item['obj_type'],
                                        item['obj_doc']))
         else:
             print(FORMAT_CHILD.format(item['obj_parent'],
                                       item['obj_child'],
                                       item['obj_doc']))
-        if page:
-            p -= 1
 
-            if p == 0:
-                input('Press enter to continue...')
-                p = page
+        if page and (num > 0 and num % page == 0):
+            input('Press enter to continue...')
 
 
 if __name__ == '__main__':
