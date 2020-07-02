@@ -1,13 +1,15 @@
 """ Get useful information from live Python objects. """
 
 __all__ = ['print_attributes']
-__author__ = ('Chagay Nikolay aka Electronick <chagay.ni@gmail.com>')
+__author__ = 'Chagay Nikolay aka Electronick <chagay.ni@gmail.com>'
 
 # This module is in the public domain.  No warranties.
 
 import inspect
 import argparse
 import importlib
+import statistics
+import _json
 
 # ----------------------------------------------------------- const
 FORMAT_PARENT = "{} [{}] ({})"
@@ -17,41 +19,6 @@ FORMAT_CHILD = "    {}.{} ({})"
 TEXT_LENGTH = 79
 
 NAME_LENGTH = 20
-
-
-# ----------------------------------------------------------- private
-def _parser():
-    """Return the parsed arguments """
-    parser = argparse.ArgumentParser(description='Parse object and setting attributes')
-    parser.add_argument('-o', action='store', dest='object', type=str, default=None,
-                        help='Object for introspection')
-    parser.add_argument('-op', action='store_true', dest='only_public',
-                        help='Deselect private attributes')
-
-    parser.add_argument('-p', action='store', dest='page_count', type=int, default=None,
-                        help='Pagination')
-
-    return parser.parse_args()
-
-
-def _parse_args(args):
-    """
-    First if args.object is None then print attributes of __builtins__ module
-    else
-    Try import args.object if not raise ImportError
-    and then
-    print the attributes of args.object
-    """
-    if args.object is None or args.object == '__builtins__':
-        print_attributes(__builtins__, args.page_count, args.only_public)
-        return
-
-    try:
-        obj = importlib.import_module(args.object)
-
-        print_attributes(obj, args.page_count, args.only_public)
-    except ImportError:
-        print("Unable to import '{}'\n".format(args.object))
 
 
 def _trim(text, n=TEXT_LENGTH):
@@ -98,12 +65,16 @@ def _getattr(parent, obj):
 
 def _attributes(parent, rem_parent=None, processed=None, only_public=False):
     """Obtaining recursively the attributes of the parent.
-     stores the received attributes in the processed variable"""
+
+     stores the received attributes in the processed variable
+
+     """
     if processed is None:
         processed = set()
 
     for name, item in (arg for arg in inspect.getmembers(parent)
-                       if (only_public and not arg[0].startswith('_')) or not only_public):
+                       if (only_public and not arg[0].startswith('_'))
+                          or not only_public):
 
         try:
             if (parent, name,) not in processed:
@@ -112,7 +83,6 @@ def _attributes(parent, rem_parent=None, processed=None, only_public=False):
                     yield _getattr(rem_parent, item)
                 else:
                     yield _getattr(item, item)
-
             else:
                 continue
         except TypeError:
@@ -141,8 +111,7 @@ def print_attributes(my_object, page=None, only_public=False):
 
 
 if __name__ == '__main__':
-    """
-    Создать скрипт на python который выведет 
+    """Создать скрипт на python который выведет 
     1. Все встроенные переменные, функции, типы и классы 
     с обозначением их типа
     
@@ -155,5 +124,24 @@ if __name__ == '__main__':
         Имя [тип] (сигнатура/описание одной строкой 
         без переносов не более 80 символов)
         <4 пробела>Имя.метод (сигнатура/описание)
+        
     """
-    _parse_args(_parser())
+    """Return the parsed arguments """
+    parser = argparse.ArgumentParser(description='Parse object and setting attributes')
+    parser.add_argument('-o', action='store', dest='object', type=str,
+                        default=None, help='Object for introspection')
+    parser.add_argument('-op', action='store_true', dest='only_public',
+                        help='Deselect private attributes')
+    parser.add_argument('-p', action='store', dest='page_count', type=int,
+                        default=None, help='Pagination')
+    args = parser.parse_args()
+
+    if args.object is None or args.object == '__builtins__':
+        print_attributes(__builtins__, args.page_count, args.only_public)
+    else:
+        try:
+            obj = importlib.import_module(args.object)
+
+            print_attributes(obj, args.page_count, args.only_public)
+        except ImportError:
+            print("Unable to import '{}'\n".format(args.object))
